@@ -1,4 +1,32 @@
 let apiKey = 'e15168f165msh0518b41af6884f4p1e6897jsnb093b22972f3'
+
+//event handlers
+$w.onReady(function () {
+    $w('#fromLocRepeater').onItemReady(($item, itemData, index) => fromRpItemHandler($item, itemData, index));
+    $w('#toLocRepeater').onItemReady(($item, itemData, index) => toRpItemHandler($item, itemData, index));
+    $w('#tripDataRepeater').onItemReady(($item, itemData, index) => tripDataRpItemHandler($item, itemData, index));
+    $w('#departDatePicker').onChange(() => {
+        depart = formatDate($w('#departDatePicker'))
+    })
+    $w('#returnDatePicker').onChange(() => {
+        returnDate = formatDate($w('#returnDatePicker'))
+    })
+    $w('#tripTypeRadioGroup').onChange(tripRadioHandler)
+    $w('#flightsDatapagination').onChange(e => {
+        $w('#pageChangeLoadingImage').expand()
+        changePageHandler($w('#flightsDatapagination').currentPage)
+    })
+    $w('#fromInput').onKeyPress((event) => locValidation(event, gofrom, (val) => getAirports(val, items, $w('#fromLocRepeater'), $w('#fromReaperterBox'), 'from'), $w('#fromInput').value))
+    $w('#toInput').onKeyPress((event) => locValidation(event, goto, (val) => getAirports(val, items, $w('#toLocRepeater'), $w('#toReaperterBox'), 'to'), $w('#toInput').value,))
+    $w('#searchButton').onClick(searchButtonHanle)
+    $w('#adultsText').text = adults.toString()
+    $w('#adultsPlusImage').onClick(() => stepAdults('plus'))
+    $w('#adultsminusBox').onClick(() => stepAdults('minus'))
+    $w('#classDropdown').onChange(() => {
+        tClass = $w('#classDropdown').value
+    })
+});
+
 //starting search form
 
 let gofrom = ''
@@ -14,72 +42,46 @@ let returnDate = undefined
 let adults = 0
 let tClass = 'ECO'
 let iternaryType = 'ONE_WAY'
-let noFlights = false
 let currencyCodeSymbolMap = {
     'usd': '$',
     'gbp': 'GBP',
     'inr': 'INR',
 }
-$w.onReady(function () {
-    //console.log('test')
-    $w('#repeater1').onItemReady(($item, itemData, index) => itemReadyHandler($item, itemData, index));
-    $w('#repeater2').onItemReady(($item, itemData, index) => itemReadyHandler2($item, itemData, index));
-    $w('#repeater3').onItemReady(($item, itemData, index) => itemReadyHandler3($item, itemData, index));
-    $w('#datePicker1').onChange(() => {
-        depart = formatDate($w('#datePicker1'))
-        //console.log('dat', depart)
-    })
-    $w('#datePicker2').onChange(() => {
-        returnDate = formatDate($w('#datePicker2'))
-    })
-    $w('#radioGroup1').onChange(() => {
-        const sIndex = $w('#radioGroup1').selectedIndex
-        if (sIndex === 0) {
-            iternaryType = 'ONE_WAY'
-            $w('#datePicker2').hide()
-        } if (sIndex === 1) {
-            iternaryType = 'ROUND_TRIP'
-            $w('#datePicker2').show()
-        }
-    })
-    $w('#pagination1').onChange(e => {
-        //console.log('e',$w('#pagination1').currentPage)
-        $w('#image25').expand()
-        changePageHandler($w('#pagination1').currentPage)
-    })
-    $w('#input12').onKeyPress((event) => locValidation(event, gofrom, (val) => getAirports(val, items, $w('#repeater1'), $w('#box1'), 'from'), $w('#input12').value))
-    $w('#input13').onKeyPress((event) => locValidation(event, goto, (val) => getAirports(val, items, $w('#repeater2'), $w('#box2'), 'to'), $w('#input13').value,))
-    $w('#button12').onClick(() => {
-        const errBox = $w('#box7')
-        const errText = $w('#text39')
 
-        const check = iternaryType === 'ROUND_TRIP' ? selectedFrom && selectedTo && depart && returnDate && adults : selectedFrom && selectedTo && depart && adults
-        if (check) {
-            $w('#image24').show()
-            $w('#repeater3').data = []
-            allData = []
-            paggedData = []
-            startFlightDataSearch()
-            errBox.collapse()
-        }
-        else {
-            errText.text = 'one or more fields are empty.'
-            errBox.expand()
-        }
-
-    })
-
-
-    $w('#text40').text = adults.toString()
-    $w('#vectorImage3').onClick(() => stepAdults('plus'))
-    $w('#box8').onClick(() => stepAdults('minus'))
-    $w('#dropdown1').onChange(() => {
-        tClass = $w('#dropdown1').value
-    })
-});
+function tripRadioHandler() {
+    const sIndex = $w('#tripTypeRadioGroup').selectedIndex
+    if (sIndex === 0) {
+        iternaryType = 'ONE_WAY'
+        $w('#returnDatePicker').hide()
+    } if (sIndex === 1) {
+        iternaryType = 'ROUND_TRIP'
+        $w('#returnDatePicker').show()
+    }
+}
+function searchButtonHanle() {
+    const noFBox = $w('#noFlightsBox')
+    if (!noFBox.collapsed) {
+        noFBox.collapse()
+    }
+    const errBox = $w('#searchErrorBox')
+    const errText = $w('#searchErrorText')
+    const check = iternaryType === 'ROUND_TRIP' ? selectedFrom && selectedTo && depart && returnDate && adults : selectedFrom && selectedTo && depart && adults
+    if (check) {
+        $w('#searchLoadingImage').show()
+        $w('#tripDataRepeater').data = []
+        allData = []
+        paggedData = []
+        startFlightDataSearch()
+        errBox.collapse()
+    }
+    else {
+        errText.text = 'one or more fields are empty.'
+        errBox.expand()
+    }
+}
 
 function stepAdults(action, ele) {
-    const c = $w('#text40')
+    const c = $w('#adultsText')
     if (action === 'plus' && adults < 10) {
         adults = adults + 1
         c.text = adults.toString()
@@ -89,31 +91,25 @@ function stepAdults(action, ele) {
         c.text = adults.toString()
     }
 }
-function formatDate(ele) {
-    const dDate = ele.value
-    const year = dDate.getFullYear()
-    const mon = dDate.getMonth() + 1
-    const day = dDate.getDate()
-    return `${year}-${mon}-${day}`
-}
-function itemReadyHandler($item, itemData, index) {
-    $item('#text26').text = itemData.displayName;
-    $item('#text26').onClick(() => {
-        $w('#input12').value = `${itemData.id} - ${itemData.cityName}`
+
+function fromRpItemHandler($item, itemData, index) {
+    $item('#formReapeterTxt').text = itemData.displayName;
+    $item('#formReapeterTxt').onClick(() => {
+        $w('#fromInput').value = `${itemData.id} - ${itemData.cityName}`
         selectedFrom = items['from'][index]
-        $w('#repeater1').collapse()
-        $w('#box1').collapse()
+        $w('#fromLocRepeater').collapse()
+        $w('#fromReaperterBox').collapse()
         //console.log('selectedFrom', selectedFrom)
     })
 
 }
-function itemReadyHandler2($item, itemData, index) {
-    $item('#text27').text = itemData.displayName;
-    $item('#text27').onClick(() => {
-        $w('#input13').value = `${itemData.id} - ${itemData.cityName}`
+function toRpItemHandler($item, itemData, index) {
+    $item('#toReapeterTxt').text = itemData.displayName;
+    $item('#toReapeterTxt').onClick(() => {
+        $w('#toInput').value = `${itemData.id} - ${itemData.cityName}`
         selectedTo = items['to'][index]
-        $w('#repeater2').collapse()
-        $w('#box2').collapse()
+        $w('#toLocRepeater').collapse()
+        $w('#toReaperterBox').collapse()
         //	console.log('selectedTo', selectedTo)
     })
 }
@@ -203,28 +199,41 @@ async function startFlightDataSearch() {
         let flightRepeaterItems = []
         if (iternaryType === 'ROUND_TRIP') {
             const data = await Promise.all([getFlightData(selectedFrom.id, selectedTo.id, depart, tClass, adults), getFlightData(selectedTo.id, selectedFrom.id, returnDate, tClass, adults)])
-            const departData = fDataProcessing(data[0])
-            const returnData = fDataProcessing(data[1])
-            for (let i = 0; i < returnData.length; i++) {
-                const element = returnData[i];
-                for (let i2 = 0; i2 < departData.length; i2++) {
-                    const element2 = departData[i2];
-                    flightRepeaterItems.push({ _id: newObjectId(), "depart": element2, "returnn": element, })
+            if (data[0].pricedItinerary) {
+                const departData = fDataProcessing(data[0])
+                const returnData = fDataProcessing(data[1])
+                for (let i = 0; i < returnData.length; i++) {
+                    const element = returnData[i];
+                    for (let i2 = 0; i2 < departData.length; i2++) {
+                        const element2 = departData[i2];
+                        flightRepeaterItems.push({ _id: newObjectId(), "depart": element2, "returnn": element, })
+                    }
                 }
+            } else {
+                handleNoFlights()
+                throw 'error no flights'
             }
+
         } else {
+
             const data2 = await getFlightData(selectedFrom.id, selectedTo.id, depart, tClass, adults)
-            const departData2 = fDataProcessing(data2)
-            departData2.forEach((s) => {
-                flightRepeaterItems.push({ _id: newObjectId(), "depart": s, "returnn": undefined })
-            })
+            if (data2.pricedItinerary) {
+                const departData2 = fDataProcessing(data2)
+                departData2.forEach((s) => {
+                    flightRepeaterItems.push({ _id: newObjectId(), "depart": s, "returnn": undefined })
+                })
+            } else {
+                handleNoFlights()
+                throw 'error no flights'
+            }
         }
         allData = flightRepeaterItems
         totalItems = allData.length
         totalPages = Math.round(totalItems / pageSize)
-        $w('#pagination1').currentPage = 1
-        $w('#pagination1').totalPages = totalPages === 0 ? 1 : totalPages
+        $w('#flightsDatapagination').currentPage = 1
+        $w('#flightsDatapagination').totalPages = totalPages === 0 ? 1 : totalPages
         pageHandle(flightRepeaterItems)
+
     } catch (error) {
         console.error(error)
     }
@@ -237,45 +246,39 @@ function fDataProcessing(json) {
     const segment = json.segment
     const airline = json.airline
     const airport = json.airport
-    if (price) {
-        for (let index = 0; index < price.length; index++) {
-            const element = price[index];
-            let t = { _id: newObjectId() }
-            t.duration = element.totalTripDurationInHours
-            t.totalFare = element.pricingInfo.totalFare
-            const tAirline = airline.find(a => a.code === element.pricingInfo.ticketingAirline)
-            t.ticketAirline = { code: tAirline.code, name: tAirline.name }
-            const sliceId = element.slice[0].uniqueSliceId
-            const tSilce = slice.find(s => s.uniqueSliceId === sliceId)
-            t.sliceDuration = tSilce.duration
-            let segIds = tSilce.segment.map(s => s.uniqueSegId)
-            let seg = segment.filter(s => segIds.includes(s.uniqueSegId))
-            let flights = seg.map(f => {
-                const d1 = new Date(f.arrivalDateTime)
-                const d2 = new Date(f.departDateTime)
-                const oAirportObj = airport.find(o => o.code === f.origAirport)
-                const dAirportObj = airport.find(o => o.code === f.destAirport)
-                let fl = {
-                    arrivalTime: `${d1.getHours().toString().padStart(2, '0')}:${d1.getMinutes().toString().padStart(2, "0")}`,
-                    arrivalDate: `${d1.toDateString().substring(3)}`,
-                    departureTime: `${d2.getHours().toString().padStart(2, '0')}:${d2.getMinutes().toString().padStart(2, "0")}`,
-                    departureDate: `${d2.toDateString().substring(3)}`,
-                    origAirport: { code: f.origAirport, name: oAirportObj.name },
-                    destAirport: { code: f.destAirport, name: dAirportObj.name },
-                    flightNumber: f.flightNumber,
-                    stopQuantity: f.stopQuantity,
-                    aTimestamp: d1.getTime(),
-                    dTimestamp: d2.getTime()
-                }
-                return fl
-            })
-            t.flights = flights.sort((a, b) => a.dTimestamp - b.dTimestamp)
-            items.push(t)
-        }
-    } else {
-        console.log('json', json)
-        noFlights = true
-        handleNoFlights()
+    for (let index = 0; index < price.length; index++) {
+        const element = price[index];
+        let t = { _id: newObjectId() }
+        t.duration = element.totalTripDurationInHours
+        t.totalFare = element.pricingInfo.totalFare
+        const tAirline = airline.find(a => a.code === element.pricingInfo.ticketingAirline)
+        t.ticketAirline = { code: tAirline.code, name: tAirline.name }
+        const sliceId = element.slice[0].uniqueSliceId
+        const tSilce = slice.find(s => s.uniqueSliceId === sliceId)
+        t.sliceDuration = tSilce.duration
+        let segIds = tSilce.segment.map(s => s.uniqueSegId)
+        let seg = segment.filter(s => segIds.includes(s.uniqueSegId))
+        let flights = seg.map(f => {
+            const d1 = new Date(f.arrivalDateTime)
+            const d2 = new Date(f.departDateTime)
+            const oAirportObj = airport.find(o => o.code === f.origAirport)
+            const dAirportObj = airport.find(o => o.code === f.destAirport)
+            let fl = {
+                arrivalTime: `${d1.getHours().toString().padStart(2, '0')}:${d1.getMinutes().toString().padStart(2, "0")}`,
+                arrivalDate: `${d1.toDateString().substring(3)}`,
+                departureTime: `${d2.getHours().toString().padStart(2, '0')}:${d2.getMinutes().toString().padStart(2, "0")}`,
+                departureDate: `${d2.toDateString().substring(3)}`,
+                origAirport: { code: f.origAirport, name: oAirportObj.name },
+                destAirport: { code: f.destAirport, name: dAirportObj.name },
+                flightNumber: f.flightNumber,
+                stopQuantity: f.stopQuantity,
+                aTimestamp: d1.getTime(),
+                dTimestamp: d2.getTime()
+            }
+            return fl
+        })
+        t.flights = flights.sort((a, b) => a.dTimestamp - b.dTimestamp)
+        items.push(t)
     }
     return items
 }
@@ -291,7 +294,7 @@ async function getFlightData(from, to, depart, tClass, adults) {
                 'x-rapidapi-key': apiKey
             }
         })
-        const response = req.json()
+        const response = await req.json()
         return response
     } catch (e) {
         console.error(e)
@@ -307,18 +310,18 @@ function pageHandle(data) {
         newPageData.push(element)
     }
     //console.log('tpD', thisPageData)
-    $w('#repeater3').data = []
+    $w('#tripDataRepeater').data = []
     //console.log('items: ',flightData)
     if (newPageData.length > 0) {
         //console.log('paggedData', newPageData)
         paggedData = newPageData
-        $w('#repeater3').data = newPageData
+        $w('#tripDataRepeater').data = newPageData
         //$w('#columnStrip2').show()
-        $w('#repeater3').expand()
-        $w('#pagination1').expand()
+        $w('#tripDataRepeater').expand()
+        $w('#flightsDatapagination').expand()
     } else {
-        $w('#repeater3').collapse()
-        $w('#pagination1').collapse()
+        $w('#tripDataRepeater').collapse()
+        $w('#flightsDatapagination').collapse()
         //$w('#columnStrip2').hide()
     }
 }
@@ -327,47 +330,47 @@ function changePageHandler(currentpage) {
     //console.log('page', page)
     pageHandle(allData)
 }
-function itemReadyHandler3($item, itemData, index) {
+function tripDataRpItemHandler($item, itemData, index) {
     const { depart, returnn } = itemData
     const { totalFare, ticketAirline, duration } = depart
     let sumRows = []
     let departRows = []
     let returnRows = []
 
-    const departTableRow = tableRowGenrator1(depart, depart.flights.length - 1, duration)
+    const departTableRow = summaryTableRowGenrator(depart, depart.flights.length - 1, duration)
     sumRows.push(departTableRow)
     depart.flights.forEach(element => {
-        let it = tableRowGenrator2(element)
+        let it = flightDetailsTableRowGenrator(element)
         departRows.push(it)
     });
     if (returnn) {
-        let r = tableRowGenrator1(returnn, returnn.flights.length - 1, returnn.duration)
+        let r = summaryTableRowGenrator(returnn, returnn.flights.length - 1, returnn.duration)
         sumRows.push(r)
         returnn.flights.forEach(element => {
-            let it = tableRowGenrator2(element)
+            let it = flightDetailsTableRowGenrator(element)
             returnRows.push(it)
         });
     }
 
-    $w('#table1').rows = sumRows
-    $w('#table2').rows = departRows
+    $w('#tripSummaryTable').rows = sumRows
+    $w('#departFlightDetailsTable').rows = departRows
     if (returnn) {
-        $w('#table3').rows = returnRows
-        $w('#group8').expand()
+        $w('#returnFlightDetailsTable').rows = returnRows
+        $w('#returnFlightDetailsUIgroup').expand()
     }
     let total = totalFare
     if (returnn) {
         total = total + returnn.totalFare
     }
-    $item('#text28').text = `${ticketAirline.name}`
-    $item('#text36').text = `${Math.round(total)} ${currencyCodeSymbolMap[currency]}`
+    $item('#airlineNameTxt').text = `${ticketAirline.name}`
+    $item('#totalPriceTxt').text = `${Math.round(total)} ${currencyCodeSymbolMap[currency]}`
     if (index === paggedData.length - 1) {
-        $w('#image24').hide()
-        $w('#image25').collapse()
+        $w('#searchLoadingImage').hide()
+        $w('#pageChangeLoadingImage').collapse()
     }
 
-    $item('#box5').onClick(() => {
-        const el = $item('#box6')
+    $item('#openFLighsDetails').onClick(() => {
+        const el = $item('#completeFlightDetailsBox')
         const i1 = $item('#vectorImage1')
         const i2 = $item('#vectorImage2')
         const c = el.collapsed
@@ -383,7 +386,7 @@ function itemReadyHandler3($item, itemData, index) {
     })
 }
 
-function tableRowGenrator1(obj, lastIndex, duration) {
+function summaryTableRowGenrator(obj, lastIndex, duration) {
     const d = duration + 'h'
     let r = {
         "dtime": obj.flights[0].departureTime,
@@ -396,7 +399,7 @@ function tableRowGenrator1(obj, lastIndex, duration) {
     }
     return r
 }
-function tableRowGenrator2(obj) {
+function flightDetailsTableRowGenrator(obj) {
     let arrDate = new Date(obj.aTimestamp)
     let depDate = new Date(obj.dTimestamp)
     let t = arrDate.getTime() - depDate.getTime()
@@ -415,6 +418,13 @@ function tableRowGenrator2(obj) {
 //end flights data
 
 //helpers
+function formatDate(ele) {
+    const dDate = ele.value
+    const year = dDate.getFullYear()
+    const mon = dDate.getMonth() + 1
+    const day = dDate.getDate()
+    return `${year}-${mon}-${day}`
+}
 function newObjectId() {
     const timestamp = Math.floor(new Date().getTime() / 1000).toString(16);
     const objectId = timestamp + 'xxxxxxxxxxxxxxxx'.replace(/[x]/g, () => {
@@ -423,9 +433,8 @@ function newObjectId() {
     return objectId;
 }
 function handleNoFlights() {
-    if (noFlights) {
-        $w('#text44').expand()
-    } else {
-        $w('#text44').collapse()
-    }
+    $w('#searchLoadingImage').hide()
+    $w('#tripDataRepeater').collapse()
+    $w('#flightsDatapagination').collapse()
+    $w('#noFlightsBox').expand()
 }
